@@ -39,5 +39,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: saoui-1.16.5-SAO-FX
-          path: build/libs/*.jar
+          # N'uploader QUE le jar principal (reobf) — exclure -deobf, -sources, -all
+          path: |
+            build/libs/saoui-*.jar
+            !build/libs/saoui-*-deobf.jar
+            !build/libs/saoui-*-sources.jar
+            !build/libs/saoui-*-all.jar
           retention-days: 30
