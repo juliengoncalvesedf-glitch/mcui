@@ -89,7 +89,7 @@ def replaceResources = tasks.register("replaceResources", Copy) {
 }
 
 processResources {
-    duplicatesStrategy(DuplicatesStrategy.FAIL)
+    duplicatesStrategy(DuplicatesStrategy.INCLUDE)
     exclude('META-INF/mods.toml')
     configure { finalizedBy(replaceResources) }
 }
@@ -166,7 +166,7 @@ jar {
 
 tasks.withType(Copy) {
     includeEmptyDirs = false
-    duplicatesStrategy = DuplicatesStrategy.WARN
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 task sourcesJar(type: Jar) {
