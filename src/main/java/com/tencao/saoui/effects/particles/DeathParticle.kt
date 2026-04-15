@@ -52,13 +52,13 @@ class DeathParticle(
         this.particleBlue  = 1.0f
         this.particleAlpha = 1.0f
 
-        // ── Taille : grande variation selon le type ───────────────────────
+        // ── Taille : petite variation — plusieurs petits éclats ──────────
         val sizeBase = if (isCoreBurst) {
-            // Particules centrales : plus grandes (les gros éclats)
-            1.5f + rand.nextFloat() * 1.2f
+            // Particules centrales : légèrement plus grandes que les autres
+            0.3f + rand.nextFloat() * 0.35f
         } else {
-            // Particules normales : taille variée pour le côté naturel
-            0.5f + rand.nextFloat() * 1.8f
+            // Particules normales : petites et variées
+            0.08f + rand.nextFloat() * 0.30f
         }
         this.particleScale *= sizeBase
         this.baseQuadSize = this.particleScale
