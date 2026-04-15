@@ -13,17 +13,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      # Java 8 : version cible du projet (toolchain = Java 8 dans build.gradle)
+      # Gradle 7.1 supporte Java 8, et pas besoin de provisioning toolchain additionnel
+      - name: Set up Java 8
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '8'
           distribution: 'temurin'
 
-      - name: Setup Gradle 7.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '7.1'
-          cache-disabled: true
+      # Gradle 7.1 téléchargé manuellement — on N'utilise PAS gradle/actions/setup-gradle
+      # car cette action injecte un init script compilé en Java 17 (class version 61)
+      # que Gradle 7.1 (ASM 7.x) ne sait pas lire → erreur "Unsupported class file major version 61"
+      - name: Download and install Gradle 7.1
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-7.1-bin.zip -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp/
+          echo "/tmp/gradle-7.1/bin" >> $GITHUB_PATH
 
       - name: Build with Gradle
         run: gradle build --no-daemon --no-build-cache
