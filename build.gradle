@@ -111,13 +111,8 @@ classes.configure {
     dependsOn(replaceResources)
 }
 
-// This is only here while FG is under active development
-configurations.all  {
-    resolutionStrategy {
-        cacheDynamicVersionsFor 10, 'seconds'
-        cacheChangingModulesFor 0, 'seconds'
-    }
-}
+// NOTE: configurations.all resolutionStrategy removed â€” causes ForgeGradle 5.1 conflict
+// ("Cannot mutate content repository descriptor after repository has been used")
 
 configurations {
     shadow  {
@@ -141,7 +136,7 @@ repositories {
         name = 'cursemaven'
         url = 'https://www.cursemaven.com'
     }
-    // Dépendances locales (gnu-jel extrait)
+    // DÃ©pendances locales (gnu-jel extrait)
     flatDir {
         dirs 'libs'
     }
@@ -171,7 +166,7 @@ jar {
         exclude 'META-INF/MANIFEST.MF', 'META-INF/buildinfo.xml', 'LICENSE*', 'changelog*', 'NOTICE*',
                 'javax/annotation/**', 'edu/umd/cs/findbugs/annotations/**'
     }
-    // Inclure les autres dépendances shadow (ph-css, ph-commons, slf4j)
+    // Inclure les autres dÃ©pendances shadow (ph-css, ph-commons, slf4j)
     for (dep in configurations.shadow.resolvedConfiguration.resolvedArtifacts) {
         from(project.zipTree(dep.file)) {
             exclude 'META-INF/MANIFEST.MF', 'META-INF/buildinfo.xml', 'LICENSE*', 'changelog*', 'NOTICE*',
