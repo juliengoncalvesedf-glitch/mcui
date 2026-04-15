@@ -1,232 +1,169 @@
-/*
- * Copyright (C) 2016-2019 Arnaud 'Bluexin' Solé
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+package com.tencao.saoui.effects.particles
 
-package com.tencao.saoui.effects
-
-import com.mojang.blaze3d.vertex.IVertexBuilder
-import com.tencao.saomclib.Client
-import com.tencao.saomclib.GLCore
-import com.tencao.saoui.resources.StringNames
 import net.minecraft.client.particle.IParticleRenderType
-import net.minecraft.client.particle.Particle
-import net.minecraft.client.renderer.ActiveRenderInfo
+import net.minecraft.client.particle.SpriteTexturedParticle
+import net.minecraft.client.renderer.LightTexture
 import net.minecraft.client.world.ClientWorld
-import net.minecraft.util.Direction
-import java.util.*
-import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.sin
+import kotlin.math.PI
 
-class DeathParticles private constructor(world: ClientWorld, xCoord: Double, yCoord: Double, zCoord: Double, redValue: Float, greenValue: Float, blueVale: Float, scale: Float) : Particle(world, xCoord, yCoord, zCoord, 0.0, 0.0, 0.0) {
+/**
+ * Particule de mort style SAO — Éclats cristallins fidèles à l'anime.
+ *
+ * Comportement visuel :
+ *  🔺 Texture triangulaire (éclat de verre/cristal) parmi 4 variantes
+ *  💥 Explosion violente initiale : burst rapide dans toutes les directions
+ *  ✨ Flash blanc intense au spawn (0–15% de vie)
+ *  🔵 Transition vers bleu SAO électrique (15–40%)
+ *  🌊 Flottement progressif + décélération naturelle (physique réaliste)
+ *  ⬆️  Légère lévitation persistante (les éclats montent doucement)
+ *  🌀 Rotation continue (chaque éclat tourne sur lui-même)
+ *  💡 Toujours éclairée au maximum (glow dans le noir)
+ *  🌟 Fade-out quadratique sur les 35% finaux
+ */
+class DeathParticle(
+    world: ClientWorld,
+    x: Double, y: Double, z: Double,
+    vx: Double, vy: Double, vz: Double,
+    r: Float, g: Float, b: Float,
+    private val isCoreBurst: Boolean = false
+) : SpriteTexturedParticle(world, x, y, z, 0.0, 0.0, 0.0) {
 
-    private var time: Float = 0.toFloat()
-    private var particleX: Float = 0.toFloat()
-    private var particleY: Float = 0.toFloat()
-    private var particleZ: Float = 0.toFloat()
-    private var f0: Float = 0.toFloat()
-    private var f1: Float = 0.toFloat()
-    private var rotationY: Float = 0.toFloat() // Rotation around Y axis
-    private val speedRotationY: Float // Rotation speed around Y axis
-
-    constructor(world: ClientWorld, xCoord: Double, yCoord: Double, zCoord: Double, redValue: Float, greenValue: Float, blueValue: Float) : this(world, xCoord, yCoord, zCoord, redValue, greenValue, blueValue, 1.0f)
+    private val baseRed   = r
+    private val baseGreen = g
+    private val baseBlue  = b
+    private val baseQuadSize: Float
+    private val rotSpeed: Float
 
     init {
-        this.motionX = ((Math.random() * 2.0 - 1.0).toFloat() * 0.05f).toDouble()
-        this.motionY = ((Math.random() * 2.0 - 1.0).toFloat() * 0.05f).toDouble()
-        this.motionZ = ((Math.random() * 2.0 - 1.0).toFloat() * 0.05f).toDouble()
-        this.rotationY = rand.nextFloat() * 2
-        this.speedRotationY = (rand.nextFloat() + 2.0f) / if (rand.nextBoolean()) 16.0f else -16.0f
-        this.particleRed = redValue
-        this.particleGreen = greenValue
-        this.particleBlue = blueVale
-        multiplyParticleScaleBy(scale)
-        this.maxAge = (8.0 / (Math.random() * 0.8 + 0.2)).toInt()
-        this.maxAge = (this.maxAge.toFloat() * scale).toInt()
-    }
+        // ── Vitesse initiale : explosion violente ─────────────────────────
+        this.motionX = vx
+        this.motionY = vy
+        this.motionZ = vz
 
-    override fun renderParticle(buffer: IVertexBuilder, renderInfo: ActiveRenderInfo, partialTicks: Float) {
-        this.time = partialTicks
-        this.particleX = renderInfo.blockPos.x.toFloat()
-        this.particleY = renderInfo.blockPos.y.toFloat()
-        this.particleZ = renderInfo.blockPos.z.toFloat()
-        this.f0 = renderInfo.pitch
-        this.f1 = renderInfo.yaw
+        // ── Rotation aléatoire rapide ─────────────────────────────────────
+        this.rotSpeed = ((Math.random() - 0.5) * 0.25).toFloat()
+        this.particleAngle = (Math.random() * 2.0 * PI).toFloat()
 
-        queuedRenders.add(this)
+        // ── Couleur initiale = blanc flash ────────────────────────────────
+        this.particleRed   = 1.0f
+        this.particleGreen = 1.0f
+        this.particleBlue  = 1.0f
+        this.particleAlpha = 1.0f
 
-        var particle = (this.age.toFloat() + time) / this.maxAge.toFloat() * 32.0f
-
-        if (particle < 0.0f) particle = 0.0f
-
-        if (particle > 1.0f) particle = 1.0f
-
-        val particleWidth = 0.1f * this.width * particle
-        val particleHeight = 0.1f * this.height * particle
-        val xPos = (this.prevPosX + (this.posX - this.prevPosX) * time).toFloat()
-        val yPos = (this.prevPosY + (this.posY - this.prevPosY) * time).toFloat()
-        val zPos = (this.prevPosZ + (this.posZ - this.prevPosZ) * time).toFloat()
-        val colorIntensity = 1.0f
-
-        val x1: Double = (-(this.particleX + f0) * particleWidth).toDouble()
-        val y1: Double = (-this.particleY * particleHeight).toDouble()
-        val z1: Double = (-(this.particleZ + f1) * particleWidth).toDouble()
-        val x2: Double = ((f0 - this.particleX) * particleWidth).toDouble()
-        val y2: Double = (this.particleY * particleHeight).toDouble()
-        val z2: Double = ((f1 - this.particleZ) * particleWidth).toDouble()
-        val x3: Double = ((this.particleX + f0) * particleWidth).toDouble()
-        val y3: Double = (this.particleY * particleHeight).toDouble()
-        val z3: Double = ((this.particleZ + f1) * particleWidth).toDouble()
-        val x4: Double = ((this.particleX - f0) * particleWidth).toDouble()
-        val y4: Double = (-this.particleY * particleHeight).toDouble()
-        val z4: Double = ((this.particleZ - f1) * particleWidth).toDouble()
-        val e = Client.player!!.horizontalFacing
-        val q = e == Direction.NORTH || e == Direction.SOUTH
-        val a = (if (q) if (rotationY < 1.5f && rotationY > 0.5f) rotationY - 1.0f else rotationY + 1.0f else rotationY) * Math.PI
-        val cos = cos(a)
-        val sin = sin(a)
-
-        Client.textureManager.bindTexture(StringNames.particleLarge)
-
-        if (a < Math.PI) {
-            buffer.pos(xPos + x1 * cos, yPos + y1, zPos + z1 * sin).tex(0.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            buffer.pos(xPos + x1 * cos, yPos + y1, zPos + z1 * sin).tex(0.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            buffer.pos(xPos + x2 * cos, yPos + y2, zPos + z2 * sin).tex(1.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            buffer.pos(xPos + x3 * cos, yPos + y3, zPos + z3 * sin).tex(1.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            buffer.pos(xPos + x4 * cos, yPos + y4, zPos + z4 * sin).tex(0.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
+        // ── Taille : grande variation selon le type ───────────────────────
+        val sizeBase = if (isCoreBurst) {
+            // Particules centrales : plus grandes (les gros éclats)
+            1.5f + rand.nextFloat() * 1.2f
         } else {
-            buffer.pos(xPos - x1 * cos, yPos + y1, zPos - z1 * sin).tex(0.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            buffer.pos(xPos - x2 * cos, yPos + y2, zPos - z2 * sin).tex(1.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            buffer.pos(xPos - x3 * cos, yPos + y3, zPos - z3 * sin).tex(1.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            buffer.pos(xPos - x4 * cos, yPos + y4, zPos - z4 * sin).tex(0.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
+            // Particules normales : taille variée pour le côté naturel
+            0.5f + rand.nextFloat() * 1.8f
         }
-    }
+        this.particleScale *= sizeBase
+        this.baseQuadSize = this.particleScale
 
-    /*
-    override fun renderParticle(worldrender: BufferBuilder, entity: Entity?, time: Float, x: Float, y: Float, z: Float, f0: Float, f1: Float) {
-        this.time = time
-        this.particleX = x
-        this.particleY = y
-        this.particleZ = z
-        this.f0 = f0
-        this.f1 = f1
-        val interpPosX = entity?.positionOffset()?.getX()?: 0.0
-        val interpPosY = entity?.positionOffset()?.getY()?: 0.0
-        val interpPosZ = entity?.positionOffset()?.getZ()?: 0.0
-
-        queuedRenders.add(this)
-
-        var particle = (this.age.toFloat() + time) / this.maxAge.toFloat() * 32.0f
-
-        if (particle < 0.0f) particle = 0.0f
-
-        if (particle > 1.0f) particle = 1.0f
-
-        val particleWidth = 0.1f * this.width * particle
-        val particleHeight = 0.1f * this.height * particle
-        val xPos = (this.prevPosX + (this.posX - this.prevPosX) * time.toDouble() - interpPosX).toFloat()
-        val yPos = (this.prevPosY + (this.posY - this.prevPosY) * time.toDouble() - interpPosY).toFloat()
-        val zPos = (this.prevPosZ + (this.posZ - this.prevPosZ) * time.toDouble() - interpPosZ).toFloat()
-        val colorIntensity = 1.0f
-
-        val x1: Double = (-(this.particleX + f0) * particleWidth).toDouble()
-        val y1: Double = (-this.particleY * particleHeight).toDouble()
-        val z1: Double = (-(this.particleZ + f1) * particleWidth).toDouble()
-        val x2: Double = ((f0 - this.particleX) * particleWidth).toDouble()
-        val y2: Double = (this.particleY * particleHeight).toDouble()
-        val z2: Double = ((f1 - this.particleZ) * particleWidth).toDouble()
-        val x3: Double = ((this.particleX + f0) * particleWidth).toDouble()
-        val y3: Double = (this.particleY * particleHeight).toDouble()
-        val z3: Double = ((this.particleZ + f1) * particleWidth).toDouble()
-        val x4: Double = ((this.particleX - f0) * particleWidth).toDouble()
-        val y4: Double = (-this.particleY * particleHeight).toDouble()
-        val z4: Double = ((this.particleZ - f1) * particleWidth).toDouble()
-        val e = Client.player!!.horizontalFacing
-        val q = e == Direction.NORTH || e == Direction.SOUTH
-        val a = (if (q) if (rotationY < 1.5f && rotationY > 0.5f) rotationY - 1.0f else rotationY + 1.0f else rotationY) * Math.PI
-        val cos = cos(a)
-        val sin = sin(a)
-
-        Client.textureManager.bindTexture(StringNames.particleLarge)
-
-        if (a < Math.PI) {
-            worldrender.pos(xPos + x1 * cos, yPos + y1, zPos + z1 * sin).tex(0.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            worldrender.pos(xPos + x1 * cos, yPos + y1, zPos + z1 * sin).tex(0.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            worldrender.pos(xPos + x2 * cos, yPos + y2, zPos + z2 * sin).tex(1.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            worldrender.pos(xPos + x3 * cos, yPos + y3, zPos + z3 * sin).tex(1.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            worldrender.pos(xPos + x4 * cos, yPos + y4, zPos + z4 * sin).tex(0.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
+        // ── Durée de vie : 20–45 ticks ────────────────────────────────────
+        this.maxAge = if (isCoreBurst) {
+            25 + (Math.random() * 15).toInt()   // burst central plus court
         } else {
-            worldrender.pos(xPos - x1 * cos, yPos + y1, zPos - z1 * sin).tex(0.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            worldrender.pos(xPos - x2 * cos, yPos + y2, zPos - z2 * sin).tex(1.0f, 1.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            worldrender.pos(xPos - x3 * cos, yPos + y3, zPos - z3 * sin).tex(1.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
-            worldrender.pos(xPos - x4 * cos, yPos + y4, zPos - z4 * sin).tex(0.0f, 0.0f).color(this.particleRed * colorIntensity, this.particleGreen * colorIntensity, this.particleBlue * colorIntensity, 1f).endVertex()
+            20 + (Math.random() * 25).toInt()   // fragments périphériques
         }
 
-    }*/
-
-    private fun renderQueued() {
+        this.canCollide = true
     }
-
-    /**
-     * Called to update the entity's position/logic.
-     */
 
     override fun tick() {
         this.prevPosX = this.posX
         this.prevPosY = this.posY
         this.prevPosZ = this.posZ
 
-        if (this.age++ >= this.maxAge) this.setExpired()
-
-        if (prevPosY == posY && motionY > 0) { // detect a collision while moving upwards (can't move up at all)
-            this.motionY = -this.motionY
+        if (this.age++ >= this.maxAge) {
+            this.setExpired()
+            return
         }
 
-        this.motionY += 0.004
+        val life = this.age.toFloat() / this.maxAge.toFloat()
+
+        // ── Couleur & Alpha ───────────────────────────────────────────────
+        when {
+            life < 0.15f -> {
+                // Flash blanc pur : très brillant au spawn
+                this.particleRed   = 1.0f
+                this.particleGreen = 1.0f
+                this.particleBlue  = 1.0f
+                this.particleAlpha = 1.0f
+            }
+            life < 0.40f -> {
+                // Transition blanc → bleu SAO électrique
+                val t = (life - 0.15f) / 0.25f
+                this.particleRed   = 1.0f - t * (1.0f - baseRed)
+                this.particleGreen = 1.0f - t * (1.0f - baseGreen)
+                this.particleBlue  = 1.0f   // reste à 1.0 (bleu maximal)
+                this.particleAlpha = 1.0f
+            }
+            life < 0.65f -> {
+                // Bleu SAO pur et stable
+                this.particleRed   = baseRed
+                this.particleGreen = baseGreen
+                this.particleBlue  = baseBlue
+                this.particleAlpha = 1.0f
+            }
+            else -> {
+                // Fade-out quadratique
+                val fadeT = (life - 0.65f) / 0.35f
+                this.particleRed   = baseRed
+                this.particleGreen = baseGreen
+                this.particleBlue  = baseBlue
+                this.particleAlpha = max(0f, 1f - fadeT * fadeT)
+            }
+        }
+
+        // ── Taille : cloche asymétrique ───────────────────────────────────
+        // Grandit rapidement au début (burst), plateau, rétrécit à la fin
+        val sizeFactor = when {
+            life < 0.15f -> 0.4f + life / 0.15f * 0.6f   // grandit vite : 0.4→1.0
+            life < 0.60f -> 1.0f                           // plateau stable
+            else -> {
+                val t = (life - 0.60f) / 0.40f
+                1.0f - t * t                                // rétrécit en courbe
+            }
+        }
+        this.particleScale = baseQuadSize * sizeFactor
+
+        // ── Rotation continue ─────────────────────────────────────────────
+        this.prevParticleAngle = this.particleAngle
+        this.particleAngle += (PI * rotSpeed * 2.0).toFloat()
+
+        // ── Physique : lévitation + décélération ──────────────────────────
+        // Phase active : décélération du burst initial + légère lévitation
+        if (life < 0.5f) {
+            this.motionY += 0.0015  // micro-poussée vers le haut
+        } else {
+            this.motionY -= 0.0008  // gravité légère sur la fin
+        }
+
         this.move(this.motionX, this.motionY, this.motionZ)
-        this.motionX *= 0.8999999761581421
-        this.motionY *= 0.8999999761581421
-        this.motionZ *= 0.8999999761581421
-        this.rotationY += this.speedRotationY
-        this.rotationY = this.rotationY % 2.0f
+
+        // Friction : lente pour que les éclats glissent longtemps dans l'air
+        this.motionX *= 0.91
+        this.motionY *= 0.95
+        this.motionZ *= 0.91
 
         if (this.onGround) {
-            this.motionX *= 0.699999988079071
-            this.motionZ *= 0.699999988079071
+            this.motionX *= 0.55
+            this.motionZ *= 0.55
+            this.prevParticleAngle = this.particleAngle
+            this.particleAngle = 0.0f
         }
+    }
+
+    // Glow maximal : visible même dans les zones sombres
+    override fun getBrightnessForRender(partialTick: Float): Int {
+        return LightTexture.packLight(15, 15)
     }
 
     override fun getRenderType(): IParticleRenderType {
-        return IParticleRenderType.CUSTOM
-    }
-
-    companion object {
-
-        var queuedRenders: Queue<DeathParticles> = ArrayDeque()
-
-        internal fun dispatchQueuedRenders() {
-            // Client.minecraft.renderManager.bindTexture(StringNames.particleLarge)
-
-            GLCore.glAlphaTest(true)
-            // GLCore.glBlend(true)
-            queuedRenders.forEach { p ->
-                p.renderQueued()
-            }
-            // GLCore.glBlend(false)
-
-            queuedRenders.clear()
-        }
+        return IParticleRenderType.PARTICLE_SHEET_TRANSLUCENT
     }
 }
