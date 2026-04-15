@@ -35,27 +35,81 @@ jobs:
         env:
           JAVA_TOOL_OPTIONS: "-Xmx4g"
 
-      - name: Verify particle assets in JAR
+      - name: Inject particle assets into JAR
         run: |
+          # Trouver le JAR principal (pas -deobf, -sources, -all)
           JAR=$(ls build/libs/saoui-*.jar | grep -v '\-deobf\|\-sources\|\-all' | head -1)
-          echo "JAR principal : $JAR"
-          echo "--- Contenu particles dans le JAR ---"
+          echo "JAR cible : $JAR"
+          echo "Contenu particles AVANT injection :"
           python3 -c "
-          import zipfile, sys
-          with zipfile.ZipFile('$JAR', 'r') as z:
-              particles = [f for f in z.namelist() if 'particle' in f.lower()]
-              if not particles:
-                  print('ERREUR: Aucun fichier particle trouvé dans le JAR!')
-                  sys.exit(1)
-              for p in sorted(particles):
-                  print(f'  OK: {p}')
+          import zipfile
+          with zipfile.ZipFile('$JAR','r') as z:
+              p=[f for f in z.namelist() if 'particle' in f.lower()]
+              print(f'  {len(p)} fichier(s) particle')
+              [print(f'  - {f}') for f in sorted(p)]
+          "
+          # Injection directe des assets dans le JAR final
+          python3 << 'PYEOF'
+          import zipfile, os, shutil
+
+          jar_path = next(
+              f for f in os.listdir('build/libs')
+              if f.startswith('saoui-') and f.endswith('.jar')
+              and '-deobf' not in f and '-sources' not in f and '-all' not in f
+          )
+          jar_path = f'build/libs/{jar_path}'
+          tmp_path = jar_path + '.tmp'
+
+          assets_to_inject = [
+              ('src/main/resources/assets/saoui/particles/death_particle.json',
+               'assets/saoui/particles/death_particle.json'),
+              ('src/main/resources/assets/saoui/textures/particle/death_particle.png',
+               'assets/saoui/textures/particle/death_particle.png'),
+              ('src/main/resources/assets/saoui/textures/particle/death_particle2.png',
+               'assets/saoui/textures/particle/death_particle2.png'),
+              ('src/main/resources/assets/saoui/textures/particle/death_particle3.png',
+               'assets/saoui/textures/particle/death_particle3.png'),
+              ('src/main/resources/assets/saoui/textures/particle/death_particle4.png',
+               'assets/saoui/textures/particle/death_particle4.png'),
+          ]
+
+          with zipfile.ZipFile(jar_path, 'r') as zin, \
+               zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+              # Copier tout le JAR existant (sauf les fichiers qu'on va remplacer)
+              inject_paths = {dst for _, dst in assets_to_inject}
+              for item in zin.infolist():
+                  if item.filename not in inject_paths:
+                      zout.writestr(item, zin.read(item.filename))
+              # Injecter nos assets
+              for src, dst in assets_to_inject:
+                  if os.path.exists(src):
+                      with open(src, 'rb') as f:
+                          data = f.read()
+                      zout.writestr(dst, data)
+                      print(f'  INJECTE: {dst} ({len(data)} octets)')
+                  else:
+                      print(f'  MANQUANT: {src}')
+                      raise FileNotFoundError(src)
+
+          os.replace(tmp_path, jar_path)
+          print(f'JAR mis a jour : {jar_path}')
+          PYEOF
+
+          echo "Contenu particles APRES injection :"
+          python3 -c "
+          import zipfile
+          jar=next(f for f in __import__('os').listdir('build/libs')
+                   if f.startswith('saoui-') and f.endswith('.jar')
+                   and '-deobf' not in f and '-sources' not in f and '-all' not in f)
+          with zipfile.ZipFile(f'build/libs/{jar}','r') as z:
+              p=[f for f in z.namelist() if 'particle' in f.lower()]
+              [print(f'  OK: {f}') for f in sorted(p)]
           "
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: saoui-1.16.5-SAO-FX
-          # N'uploader QUE le jar principal (reobf) — exclure -deobf, -sources, -all
           path: |
             build/libs/saoui-*.jar
             !build/libs/saoui-*-deobf.jar
