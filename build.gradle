@@ -12,13 +12,6 @@ buildscript {
             url = 'https://oss.sonatype.org/content/repositories/snapshots/'
         }
     }
-    // This is only here while FG is under active development
-    configurations.classpath {
-        resolutionStrategy {
-            cacheDynamicVersionsFor 10, 'seconds'
-            cacheChangingModulesFor 0, 'seconds'
-        }
-    }
     dependencies {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.4'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.10"
@@ -37,10 +30,8 @@ apply plugin: 'maven-publish'
 apply plugin: 'kotlin'
 apply plugin: 'kotlinx-serialization'
 
-//Only edit below this line, the above code adds and enables the necessary things for Forge to be setup.
 idea {
     module {
-        //Exclude directories from being managed
         for (String excludeDirName in ["run", "out", "logs", "gradle"]) {
             File excludeDir = new File(projectDir, excludeDirName)
             excludeDirs.add(excludeDir)
@@ -56,8 +47,6 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(8)
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
-
-
 minecraft {
     mappings channel: 'snapshot', version: '20210309-1.16.5'
 
@@ -70,7 +59,6 @@ minecraft {
                 source sourceSets.main
             }
         }
-
         server {
             workingDirectory file('run')
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
@@ -79,7 +67,6 @@ minecraft {
                 source sourceSets.main
             }
         }
-
         data {
             workingDirectory file('run')
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
@@ -111,11 +98,8 @@ classes.configure {
     dependsOn(replaceResources)
 }
 
-// NOTE: configurations.all resolutionStrategy removed â€” causes ForgeGradle 5.1 conflict
-// ("Cannot mutate content repository descriptor after repository has been used")
-
 configurations {
-    shadow  {
+    shadow {
         transitive = false
     }
     implementation.extendsFrom shadow
@@ -125,17 +109,14 @@ configurations {
 
 repositories {
     mavenCentral()
-    // KotlinForForge - actif
     maven {
         name = 'kotlinforforge'
         url = 'https://thedarkcolour.github.io/KotlinForForge/'
     }
-    // Curse Maven pour saomclib
     maven {
         name = 'cursemaven'
         url = 'https://www.cursemaven.com'
     }
-    // DÃ©pendances locales (gnu-jel extrait)
     flatDir {
         dirs 'libs'
     }
@@ -146,14 +127,14 @@ dependencies {
     implementation 'thedarkcolour:kotlinforforge:1.17.0'
     implementation 'com.ibm.icu:icu4j:70.1'
 
-    // gnu-jel fourni localement depuis le dossier libs/
+    // gnu-jel fourni localement (extrait du jar original, maven.bluexin.be est mort)
     shadow files('libs/gnu-jel-2.1.3-debug.jar')
 
     shadow 'com.helger:ph-css:6.5.0'
     shadow 'com.helger.commons:ph-commons:10.1.6'
     shadow 'org.slf4j:slf4j-api:1.7.36'
 
-    // saomclib via Curse Maven (plus besoin de maven.bluexin.be)
+    // saomclib via Curse Maven (maven.bluexin.be est mort)
     implementation fg.deobf("curse.maven:saomclib-262752:3951805")
 
     implementation group: 'javax.xml.bind', name: 'jaxb-api', version: '2.3.1'
@@ -165,14 +146,12 @@ jar {
         exclude 'META-INF/MANIFEST.MF', 'META-INF/buildinfo.xml', 'LICENSE*', 'changelog*', 'NOTICE*',
                 'javax/annotation/**', 'edu/umd/cs/findbugs/annotations/**'
     }
-    // Inclure les autres dÃ©pendances shadow (ph-css, ph-commons, slf4j)
     for (dep in configurations.shadow.resolvedConfiguration.resolvedArtifacts) {
         from(project.zipTree(dep.file)) {
             exclude 'META-INF/MANIFEST.MF', 'META-INF/buildinfo.xml', 'LICENSE*', 'changelog*', 'NOTICE*',
                     'javax/annotation/**', 'edu/umd/cs/findbugs/annotations/**'
         }
     }
-
     manifest.attributes([
             "Specification-Title"     : "saoui",
             "Specification-Vendor"    : "Tencao, Bluexin",
@@ -182,7 +161,6 @@ jar {
             "Implementation-Vendor"   : "Tencao, Bluexin",
             "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
     ])
-
     finalizedBy 'reobfJar'
 }
 
