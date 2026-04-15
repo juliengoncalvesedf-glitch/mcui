@@ -35,6 +35,22 @@ jobs:
         env:
           JAVA_TOOL_OPTIONS: "-Xmx4g"
 
+      - name: Verify particle assets in JAR
+        run: |
+          JAR=$(ls build/libs/saoui-*.jar | grep -v '\-deobf\|\-sources\|\-all' | head -1)
+          echo "JAR principal : $JAR"
+          echo "--- Contenu particles dans le JAR ---"
+          python3 -c "
+          import zipfile, sys
+          with zipfile.ZipFile('$JAR', 'r') as z:
+              particles = [f for f in z.namelist() if 'particle' in f.lower()]
+              if not particles:
+                  print('ERREUR: Aucun fichier particle trouvé dans le JAR!')
+                  sys.exit(1)
+              for p in sorted(particles):
+                  print(f'  OK: {p}')
+          "
+
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
