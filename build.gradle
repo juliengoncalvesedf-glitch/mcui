@@ -20,7 +20,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.4'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.10"
         classpath 'org.jetbrains.kotlin:kotlin-serialization:1.6.10'
     }
@@ -125,7 +125,6 @@ configurations {
 
 repositories {
     mavenCentral()
-    mavenLocal()
     // KotlinForForge - actif
     maven {
         name = 'kotlinforforge'
