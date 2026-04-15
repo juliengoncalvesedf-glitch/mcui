@@ -313,7 +313,7 @@ object StaticRenderer { // TODO: add usage of scale, offset etc from capability
                 // 1. BURST EXPLOSIF INITIAL — éclats rapides dans toutes directions
                 //    Simule le moment où le corps se fragmente (comme dans l'anime)
                 // ═══════════════════════════════════════════════════════════
-                val burstCount = max(min(size * 35, 80f), 20f).toInt()
+                val burstCount = max(min(size * 50, 120f), 30f).toInt()
 
                 for (i in 0 until burstCount) {
                     // Direction sphérique aléatoire
@@ -348,7 +348,7 @@ object StaticRenderer { // TODO: add usage of scale, offset etc from capability
                 // 2. NUAGE DENSE CENTRAL — fragments qui restent groupés
                 //    (la masse lumineuse bleue au centre de l'effet)
                 // ═══════════════════════════════════════════════════════════
-                val cloudCount = max(min(size * 45, 100f), 25f).toInt()
+                val cloudCount = max(min(size * 60, 140f), 35f).toInt()
 
                 for (i in 0 until cloudCount) {
                     // Vitesse faible : ces éclats restent groupés
@@ -382,7 +382,7 @@ object StaticRenderer { // TODO: add usage of scale, offset etc from capability
                 // 3. MICRO-FRAGMENTS — petites particules rapides et lointaines
                 //    (les éclats qui fusent loin, visibles en périphérie)
                 // ═══════════════════════════════════════════════════════════
-                val microCount = max(min(size * 20, 45f), 10f).toInt()
+                val microCount = max(min(size * 30, 60f), 15f).toInt()
 
                 for (i in 0 until microCount) {
                     val theta = Math.random() * Math.PI * 2
