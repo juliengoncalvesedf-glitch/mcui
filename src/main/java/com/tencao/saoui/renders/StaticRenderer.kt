@@ -295,22 +295,64 @@ object StaticRenderer { // TODO: add usage of scale, offset etc from capability
     fun doSpawnDeathParticles(mc: Minecraft, living: Entity) {
         if (OptionCore.PARTICLES.isEnabled) {
             mc.profiler.startSection("spawnDeathParticles")
-            val world = living.world
 
             if (living.world.isRemote) {
-                val colors = arrayOf(floatArrayOf(1f / 0xFF * 0x9A, 1f / 0xFF * 0xFE, 1f / 0xFF * 0x2E), floatArrayOf(1f / 0xFF * 0x01, 1f / 0xFF * 0xFF, 1f / 0xFF * 0xFF), floatArrayOf(1f / 0xFF * 0x08, 1f / 0xFF * 0x08, 1f / 0xFF * 0x8A))
+                // ── Palette de couleurs SAO bleues fidèle à l'anime ──────────
+                // Bleu SAO principal    : #4AABFF  (74, 171, 255)
+                // Bleu clair / reflet  : #8CC8FF  (140, 200, 255)
+                // Blanc-bleu (noyau)   : #D0EEFF  (208, 238, 255)
+                val colors = arrayOf(
+                    floatArrayOf(74f / 255f,  171f / 255f, 255f / 255f),   // bleu SAO principal
+                    floatArrayOf(140f / 255f, 200f / 255f, 255f / 255f),   // bleu clair
+                    floatArrayOf(208f / 255f, 238f / 255f, 255f / 255f)    // blanc-bleu (flash)
+                )
 
                 val size = living.width * living.height
-                val pieces = max(min(size * 64, 128f), 8f).toInt()
 
+                // Nombre de particules : proportionnel à la taille, bien plus généreux
+                val pieces = max(min(size * 80, 150f), 12f).toInt()
+
+                // ── Particules principales ────────────────────────────────────
                 for (i in 0 until pieces) {
-                    val color = colors[i % 3]
+                    // Alterner les teintes : 60% bleu principal, 30% bleu clair, 10% blanc-bleu
+                    val colorIndex = when {
+                        i % 10 < 6 -> 0   // bleu SAO
+                        i % 10 < 9 -> 1   // bleu clair
+                        else       -> 2   // blanc-bleu
+                    }
+                    val color = colors[colorIndex]
 
-                    val x0 = living.width.toDouble() * (Math.random() * 2 - 1) * 0.75
-                    val y0 = living.height * Math.random()
-                    val z0 = living.width.toDouble() * (Math.random() * 2 - 1) * 0.75
+                    // Position aléatoire dans le volume de l'entité
+                    val x0 = living.width.toDouble()  * (Math.random() * 2 - 1) * 0.7
+                    val y0 = living.height.toDouble() * (Math.random() * 0.9 + 0.05)
+                    val z0 = living.width.toDouble()  * (Math.random() * 2 - 1) * 0.7
 
-                    mc.world!!.addParticle(DeathParticleData(color[0], color[1], color[2]), living.posX + x0, living.posY + y0, living.posZ + z0, 0.0, 0.0, 0.0)
+                    mc.world!!.addParticle(
+                        DeathParticleData(color[0], color[1], color[2]),
+                        living.posX + x0, living.posY + y0, living.posZ + z0,
+                        0.0, 0.0, 0.0
+                    )
+                }
+
+                // ── Burst central : particules blanc-bleu depuis le cœur ──────
+                // Simule l'explosion initiale visible dans l'anime
+                val burstCount = max(min(size * 20, 30f), 4f).toInt()
+                for (i in 0 until burstCount) {
+                    val angle = Math.random() * Math.PI * 2
+                    val radius = Math.random() * living.width * 0.3
+                    val x0 = Math.cos(angle) * radius
+                    val y0 = living.height.toDouble() * (Math.random() * 0.6 + 0.2)
+                    val z0 = Math.sin(angle) * radius
+
+                    mc.world!!.addParticle(
+                        DeathParticleData(
+                            colors[2][0],   // blanc-bleu
+                            colors[2][1],
+                            colors[2][2]
+                        ),
+                        living.posX + x0, living.posY + y0, living.posZ + z0,
+                        0.0, 0.0, 0.0
+                    )
                 }
             }
             mc.profiler.endSection()
